@@ -1,0 +1,73 @@
+version: "3"
+
+services:
+  db-mysql:
+    container_name: db-mysql
+    image: mysql:5.7
+    environment:
+      - MYSQL_ROOT_PASSWORD=xiaoe@123  # root用户数据库密码
+      - MYSQL_DATABASE=xiaoe_testing_platform  # 数据库名称
+    volumes:
+      - /home/mysql_data:/var/lib/mysql:rw  # 挂载数据库数据, 可读可写
+      - ./docker/mysql/conf/my.cnf:/etc/mysql/my.cnf  # 挂载配置文件
+#      - /etc/localtime:/etc/localtime:ro
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d/  # 挂载数据初始化sql脚本
+    ports:
+      - "3306:3306" # 与配置文件保持一致
+    restart: always
+    networks:
+      - db
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile_web
+    expose:
+      - "9000"
+#    volumes:
+#      - ./logs:/usr/src/app/uwsgi.log  # 挂载uwsgi日志
+    environment:
+      - DEBUG=false
+    links:
+      - db-mysql
+    depends_on:  # 依赖关系
+      - db-mysql
+    restart: always
+    tty: true
+    stdin_open: true
+    networks:
+      - db
+      - web
+    command:
+      - /bin/sh
+      - -c
+      - |
+        python3 manage.py collectstatic --noinput
+        python3 manage.py migrate
+        uwsgi --ini ./docker/xiaoe_testing_platform/uwsgi.ini
+
+  nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    expose:
+      - "80"
+    volumes:
+      - ./static:/usr/share/nginx/html/static  # 挂载静态文件
+      - ./docker/nginx:/var/log/nginx # 挂载日志
+    links:
+      - web
+    depends_on:
+      - web
+    restart: always
+    networks:
+      - web
+
+networks:
+    db:
+      driver: bridge
+    web:
+      driver: bridge

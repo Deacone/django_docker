@@ -1,0 +1,7 @@
+FROM python:3.7.2
+
+WORKDIR /usr/src/app
+
+COPY . .
+
+RUN pip3 install --no-cache-dir -r requirements-prod.txt -i https://mirrors.aliyun.com/pypi/simple/
